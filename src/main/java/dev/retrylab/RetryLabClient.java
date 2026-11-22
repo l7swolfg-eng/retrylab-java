@@ -1,5 +1,6 @@
 package dev.retrylab;
 
+import java.util.Locale;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -11,10 +12,38 @@ public class RetryLabClient {
 
     public static void main(String[] args)
             throws IOException, InterruptedException {
+        if (args.length != 1) {
+            System.err.println("Usage: RetryLabClient <none|fixed|exponential>");
+            return;
+        }
 
         int maxRetries = 2;
+        RetryStrategy strategy;
 
-        RetryStrategy strategy = new ExponentialBackoffStrategy(1000);
+        String mode = args[0].toLowerCase(Locale.ROOT);
+
+        switch (mode) {
+            case "none" -> {
+                maxRetries = 0;
+                strategy = new FixedDelayStrategy(0);
+            }
+
+            case "fixed" -> {
+                strategy = new FixedDelayStrategy(1000);
+            }
+
+            case "exponential" -> {
+                strategy = new ExponentialBackoffStrategy(1000);
+            }
+
+            default -> {
+                System.err.println("Unknown strategy: " + args[0]);
+                System.err.println("Choose none, fixed, or exponential.");
+                return;
+            }
+        }
+
+        System.out.println("Retry strategy: " + mode);
 
         HttpClient client = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(5))
