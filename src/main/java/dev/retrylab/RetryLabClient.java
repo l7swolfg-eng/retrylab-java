@@ -13,8 +13,8 @@ public class RetryLabClient {
             throws IOException, InterruptedException {
 
         int maxRetries = 2;
-        long initialDelayMillis = 1000;
-        boolean exponentialBackoff = true;
+
+        RetryStrategy strategy = new ExponentialBackoffStrategy(1000);
 
         HttpClient client = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(5))
@@ -49,10 +49,7 @@ public class RetryLabClient {
             }
 
             if (attempt <= maxRetries) {
-
-                long delayMillis = exponentialBackoff
-                        ? initialDelayMillis * (1L << (attempt - 1))
-                        : initialDelayMillis;
+                long delayMillis = strategy.delayMillis(attempt);
 
                 System.out.println("Waiting " + delayMillis + " ms...");
                 Thread.sleep(delayMillis);
