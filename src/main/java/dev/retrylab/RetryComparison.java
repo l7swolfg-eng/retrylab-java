@@ -17,24 +17,62 @@ public class RetryComparison {
     public static void main(String[] args)
             throws IOException, InterruptedException {
 
+        // Default simulation settings.
         int failuresBeforeSuccess = 2;
+        int maxRetries = 2;
+        long initialDelayMillis = 1000;
+
+        // Accept either no arguments or exactly three.
+        if (args.length != 0 && args.length != 3) {
+            printUsage();
+            return;
+        }
+
+        if (args.length == 3) {
+            try {
+                failuresBeforeSuccess = Integer.parseInt(args[0]);
+                maxRetries = Integer.parseInt(args[1]);
+                initialDelayMillis = Long.parseLong(args[2]);
+
+            } catch (NumberFormatException e) {
+                System.err.println("All arguments must be integers.");
+                printUsage();
+                return;
+            }
+
+            if (failuresBeforeSuccess < 0
+                    || maxRetries < 0
+                    || initialDelayMillis < 0) {
+
+                System.err.println("Arguments cannot be negative.");
+                return;
+            }
+        }
 
         System.out.println("RetryLab - Strategy Comparison");
         System.out.println("Simulated failures: " + failuresBeforeSuccess);
+        System.out.println("Maximum retries: " + maxRetries);
+        System.out.println("Initial delay: " + initialDelayMillis + " ms");
 
         System.out.println("\n--- No Retry ---");
         RetryExecutor.Result none = runScenario(
-                new FixedDelayStrategy(0), 0, failuresBeforeSuccess
+                new FixedDelayStrategy(0),
+                0,
+                failuresBeforeSuccess
         );
 
         System.out.println("\n--- Fixed Delay ---");
         RetryExecutor.Result fixed = runScenario(
-                new FixedDelayStrategy(1000), 2, failuresBeforeSuccess
+                new FixedDelayStrategy(initialDelayMillis),
+                maxRetries,
+                failuresBeforeSuccess
         );
 
         System.out.println("\n--- Exponential Backoff ---");
         RetryExecutor.Result exponential = runScenario(
-                new ExponentialBackoffStrategy(1000), 2, failuresBeforeSuccess
+                new ExponentialBackoffStrategy(initialDelayMillis),
+                maxRetries,
+                failuresBeforeSuccess
         );
 
         System.out.println("\n----- Comparison Results -----");
@@ -57,14 +95,16 @@ public class RetryComparison {
 
         AtomicInteger requestCount = new AtomicInteger();
 
-        // Port 0 lets the operating system choose an available port.
         HttpServer server = HttpServer.create(
                 new InetSocketAddress("127.0.0.1", 0), 0
         );
 
         server.createContext("/simulate", exchange -> {
             int attempt = requestCount.incrementAndGet();
-            int status = attempt <= failuresBeforeSuccess ? 503 : 200;
+
+            int status = attempt <= failuresBeforeSuccess
+                    ? 503
+                    : 200;
 
             String message = status == 503
                     ? "Simulated failure"
@@ -114,6 +154,13 @@ public class RetryComparison {
                 result.statusCode(),
                 result.attempts(),
                 result.elapsedMillis()
+        );
+    }
+
+    private static void printUsage() {
+        System.err.println(
+                "Usage: RetryComparison "
+                        + "[failuresBeforeSuccess maxRetries initialDelayMillis]"
         );
     }
 }
