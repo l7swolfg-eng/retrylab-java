@@ -130,6 +130,33 @@ class RetryExecutorTest {
         }
     }
 
+    @Test
+    void measuresElapsedTimeIncludingRetryDelay() throws Exception {
+        AtomicInteger requestCount = new AtomicInteger();
+
+        HttpServer server = createTestServer(requestCount, 503);
+        server.start();
+
+        try {
+            RetryExecutor.Result result = RetryExecutor.execute(
+                    HttpClient.newHttpClient(),
+                    createRequest(server),
+                    new FixedDelayStrategy(50),
+                    1
+            );
+
+            assertEquals(503, result.statusCode());
+            assertEquals(2, result.attempts());
+            assertEquals(2, requestCount.get());
+
+            // Total elapsed time includes the 50 ms retry delay.
+            assertTrue(result.elapsedMillis() >= 50);
+
+        } finally {
+            server.stop(0);
+        }
+    }
+
     private HttpServer createTestServer(
             AtomicInteger requestCount,
             int status

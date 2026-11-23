@@ -1,19 +1,21 @@
 package dev.retrylab;
 
-import java.util.Locale;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.Locale;
 
 public class RetryLabClient {
 
     public static void main(String[] args)
             throws IOException, InterruptedException {
+
         if (args.length != 1) {
-            System.err.println("Usage: RetryLabClient <none|fixed|exponential>");
+            System.err.println(
+                    "Usage: RetryLabClient <none|fixed|exponential>"
+            );
             return;
         }
 
@@ -38,7 +40,9 @@ public class RetryLabClient {
 
             default -> {
                 System.err.println("Unknown strategy: " + args[0]);
-                System.err.println("Choose none, fixed, or exponential.");
+                System.err.println(
+                        "Choose none, fixed, or exponential."
+                );
                 return;
             }
         }
@@ -54,7 +58,6 @@ public class RetryLabClient {
                 .timeout(Duration.ofSeconds(10))
                 .GET()
                 .build();
-
 
         RetryExecutor.Result result = RetryExecutor.execute(
                 client,
@@ -76,5 +79,11 @@ public class RetryLabClient {
                     "Non-retryable error: HTTP " + result.statusCode()
             );
         }
+
+        System.out.println();
+        System.out.println("Total attempts: " + result.attempts());
+        System.out.println(
+                "Total elapsed time: " + result.elapsedMillis() + " ms"
+        );
     }
 }
