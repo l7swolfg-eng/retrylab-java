@@ -241,4 +241,23 @@ class RetryExecutorTest {
                 .GET()
                 .build();
     }
+
+    @Test
+    void rejectsNegativeRetryLimit() {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("http://127.0.0.1:8080/simulate"))
+                .GET()
+                .build();
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> RetryExecutor.execute(
+                        HttpClient.newHttpClient(),
+                        request,
+                        new FixedDelayStrategy(0),
+                        -1
+                )
+        );
+    }
+
 }
