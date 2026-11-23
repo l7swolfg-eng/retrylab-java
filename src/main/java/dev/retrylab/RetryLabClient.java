@@ -55,36 +55,26 @@ public class RetryLabClient {
                 .GET()
                 .build();
 
-        for (int attempt = 1; attempt <= maxRetries + 1; attempt++) {
 
-            HttpResponse<String> response = client.send(
-                    request,
-                    HttpResponse.BodyHandlers.ofString()
-            );
+        RetryExecutor.Result result = RetryExecutor.execute(
+                client,
+                request,
+                strategy,
+                maxRetries
+        );
 
+        if (result.statusCode() == 200) {
+            System.out.println("Success: " + result.body());
+
+        } else if (result.statusCode() == 503) {
             System.out.println(
-                    "Attempt " + attempt + ": HTTP " + response.statusCode()
+                    "Failed after " + result.attempts() + " attempt(s)."
             );
 
-            if (response.statusCode() == 200) {
-                System.out.println("Success: " + response.body());
-                return;
-            }
-
-            // Only retry temporary 503 errors for now.
-            if (response.statusCode() != 503) {
-                System.out.println("Non-retryable error. Stopping.");
-                return;
-            }
-
-            if (attempt <= maxRetries) {
-                long delayMillis = strategy.delayMillis(attempt);
-
-                System.out.println("Waiting " + delayMillis + " ms...");
-                Thread.sleep(delayMillis);
-            }
+        } else {
+            System.out.println(
+                    "Non-retryable error: HTTP " + result.statusCode()
+            );
         }
-
-        System.out.println("Failed after " + (maxRetries + 1) + " attempts.");
     }
 }
