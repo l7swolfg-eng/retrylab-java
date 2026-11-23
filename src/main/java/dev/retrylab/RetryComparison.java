@@ -49,7 +49,7 @@ public class RetryComparison {
         printResult("Exponential", exponential);
     }
 
-    private static RetryExecutor.Result runScenario(
+    static RetryExecutor.Result runScenario(
             RetryStrategy strategy,
             int maxRetries,
             int failuresBeforeSuccess
