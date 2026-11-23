@@ -17,12 +17,10 @@ public class RetryComparison {
     public static void main(String[] args)
             throws IOException, InterruptedException {
 
-        // Default simulation settings.
         int failuresBeforeSuccess = 2;
         int maxRetries = 2;
         long initialDelayMillis = 1000;
 
-        // Accept either no arguments or exactly three.
         if (args.length != 0 && args.length != 3) {
             printUsage();
             return;
@@ -75,16 +73,24 @@ public class RetryComparison {
                 failuresBeforeSuccess
         );
 
+        System.out.println("\n--- Exponential Backoff with Jitter ---");
+        RetryExecutor.Result jitter = runScenario(
+                new ExponentialJitterStrategy(initialDelayMillis),
+                maxRetries,
+                failuresBeforeSuccess
+        );
+
         System.out.println("\n----- Comparison Results -----");
 
         System.out.printf(
-                "%-15s %-10s %-10s %-12s%n",
+                "%-22s %-10s %-10s %-12s%n",
                 "Strategy", "Status", "Attempts", "Time (ms)"
         );
 
         printResult("None", none);
         printResult("Fixed", fixed);
         printResult("Exponential", exponential);
+        printResult("Exponential jitter", jitter);
     }
 
     static RetryExecutor.Result runScenario(
@@ -149,7 +155,7 @@ public class RetryComparison {
             RetryExecutor.Result result
     ) {
         System.out.printf(
-                "%-15s %-10d %-10d %-12d%n",
+                "%-22s %-10d %-10d %-12d%n",
                 name,
                 result.statusCode(),
                 result.attempts(),
