@@ -3,6 +3,7 @@ package dev.retrylab;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -20,7 +21,6 @@ class RetryExecutorTest {
     void retriesTwiceBeforeSuccess() throws Exception {
         AtomicInteger requestCount = new AtomicInteger();
 
-        // Use an automatically assigned port to avoid conflicts.
         HttpServer server = HttpServer.create(
                 new InetSocketAddress("127.0.0.1", 0), 0
         );
@@ -29,7 +29,8 @@ class RetryExecutorTest {
             int attempt = requestCount.incrementAndGet();
             int status = attempt <= 2 ? 503 : 200;
 
-            byte[] body = "Test response".getBytes(StandardCharsets.UTF_8);
+            byte[] body = "Test response"
+                    .getBytes(StandardCharsets.UTF_8);
 
             exchange.sendResponseHeaders(status, body.length);
 
@@ -41,19 +42,9 @@ class RetryExecutorTest {
         server.start();
 
         try {
-            int port = server.getAddress().getPort();
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(
-                            "http://127.0.0.1:" + port + "/simulate"
-                    ))
-                    .timeout(Duration.ofSeconds(5))
-                    .GET()
-                    .build();
-
             RetryExecutor.Result result = RetryExecutor.execute(
                     HttpClient.newHttpClient(),
-                    request,
+                    createRequest(server),
                     new FixedDelayStrategy(0),
                     2
             );
@@ -65,5 +56,114 @@ class RetryExecutorTest {
         } finally {
             server.stop(0);
         }
+    }
+
+    @Test
+    void noRetrySendsOnlyOneRequest() throws Exception {
+        AtomicInteger requestCount = new AtomicInteger();
+
+        HttpServer server = createTestServer(requestCount, 503);
+        server.start();
+
+        try {
+            RetryExecutor.Result result = RetryExecutor.execute(
+                    HttpClient.newHttpClient(),
+                    createRequest(server),
+                    new FixedDelayStrategy(0),
+                    0
+            );
+
+            assertEquals(503, result.statusCode());
+            assertEquals(1, result.attempts());
+            assertEquals(1, requestCount.get());
+
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void nonRetryableErrorStopsImmediately() throws Exception {
+        AtomicInteger requestCount = new AtomicInteger();
+
+        HttpServer server = createTestServer(requestCount, 404);
+        server.start();
+
+        try {
+            RetryExecutor.Result result = RetryExecutor.execute(
+                    HttpClient.newHttpClient(),
+                    createRequest(server),
+                    new FixedDelayStrategy(0),
+                    3
+            );
+
+            assertEquals(404, result.statusCode());
+            assertEquals(1, result.attempts());
+            assertEquals(1, requestCount.get());
+
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void stopsAfterMaximumRetries() throws Exception {
+        AtomicInteger requestCount = new AtomicInteger();
+
+        HttpServer server = createTestServer(requestCount, 503);
+        server.start();
+
+        try {
+            RetryExecutor.Result result = RetryExecutor.execute(
+                    HttpClient.newHttpClient(),
+                    createRequest(server),
+                    new FixedDelayStrategy(0),
+                    2
+            );
+
+            assertEquals(503, result.statusCode());
+            assertEquals(3, result.attempts());
+            assertEquals(3, requestCount.get());
+
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    private HttpServer createTestServer(
+            AtomicInteger requestCount,
+            int status
+    ) throws IOException {
+
+        HttpServer server = HttpServer.create(
+                new InetSocketAddress("127.0.0.1", 0), 0
+        );
+
+        server.createContext("/simulate", exchange -> {
+            requestCount.incrementAndGet();
+
+            byte[] body = "Test response"
+                    .getBytes(StandardCharsets.UTF_8);
+
+            exchange.sendResponseHeaders(status, body.length);
+
+            try (OutputStream out = exchange.getResponseBody()) {
+                out.write(body);
+            }
+        });
+
+        return server;
+    }
+
+    private HttpRequest createRequest(HttpServer server) {
+        int port = server.getAddress().getPort();
+
+        return HttpRequest.newBuilder()
+                .uri(URI.create(
+                        "http://127.0.0.1:" + port + "/simulate"
+                ))
+                .timeout(Duration.ofSeconds(5))
+                .GET()
+                .build();
     }
 }
